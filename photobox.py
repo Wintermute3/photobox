@@ -235,12 +235,12 @@ def TestInitPeople():
 # -------------------------------------------------------------------------------
 # Our schema is built out on the following node types:
 #
-#   photo . . . filename, filesize, color/monochrome flag, image dimensions and tags:
+#   photo . . . . filename, filesize, color/monochrome flag, image dimensions and tags:
 #                   human-readable/searchable keywords
 #                   human-readable freeform text
 #                   machine-readable/searchable keywords
-#   set . . . . name, ordered group of photos
-#   view  . . . name, ordered group of sets
+#   island  . . . name, ordered group of photos
+#   ocean . . . . name, ordered group of islands
 #
 # Each view can contain one 'invisible' set which includes all photos that might
 # belong in the view but which are not yet assiged to a set in the group.  A
@@ -250,48 +250,83 @@ def TestInitPeople():
 # 'Tyson', 'Hedgepeth', 'Strickland', 'Kosik' etc.
 # -------------------------------------------------------------------------------
 
-def NewView(Name):
-  View, = db.create({'name': Name})
-  View.add_labels('View')
-  return View
+def NewOcean(Name):
+  Ocean, = db.create({'name': Name})
+  Ocean.add_labels('Ocean')
+  return Ocean
 
-def NewSet(View, Name):
-  Set, = db.create({'name': Name})
-  Set.add_labels('Set')
-  db.create(rel(Set, 'IN', View))
-  return Set
+def NewIsland(Ocean, Name):
+  Island, = db.create({'name': Name})
+  Island.add_labels('Island')
+  db.create(rel(Island, 'IN', Ocean))
+  return Island
 
-import matplotlib.pyplot as plt
+from PIL import Image
 
-def AddPhotos(Set, Filter):
+def AddPhotos(Island, Filter):
   Filenames = glob.glob(Filter)
+  Photos = []
+  Relationships = []
   for Filename in Filenames:
     Photo, = db.create({'filename': Filename})
     Photo.add_labels('Photo')
-    db.create(rel(Photo, 'IN', Set))
-    x=plt.imread(Filename)
-    plt.imshow(x)
-    plt.show()
+    Relationships += db.create(rel(Photo, 'IN', Island))
+    Photos += Photo
+    #db.add_indexed_node(Index, 'filename', Filename, Photo)
+    x = Image.open(Filename)
+    x.thumbnail((128,128))
+    x.show()
+  return Photos, Relationships
+
+#import matplotlib.pyplot as plt
+
+#def ShowPhotos(Set):
+#  x=plt.imread(Filename)
+#  plt.imshow(x)
+#  plt.show()
 
 if Neo4j_Init():
   db = neo4j.GraphDatabaseService("http://localhost:7474/db/data/")
   db.clear() # always start with an empty database.
 
-  View = NewView('Families')
+  Index = db.get_or_create_index(neo4j.Node, "index_name")
 
-  NewSet(View, 'Nagy'      )
-  NewSet(View, 'Tyson'     )
-  NewSet(View, 'Hedgepeth' )
-  NewSet(View, 'Strickland')
-  NewSet(View, 'Kosik'     )
-  NewSet(View, 'Marmaro'   )
-  NewSet(View, 'Caps'      )
-  NewSet(View, 'Rankin'    )
+  Ocean = NewOcean('Families')
 
-  Friends = NewView('Friends')
-  Circus = NewSet(Friends, 'Circus')
+  NewIsland(Ocean, 'Nagy'      )
+  NewIsland(Ocean, 'Tyson'     )
+  NewIsland(Ocean, 'Hedgepeth' )
+  NewIsland(Ocean, 'Strickland')
+  NewIsland(Ocean, 'Kosik'     )
+  NewIsland(Ocean, 'Marmaro'   )
+  NewIsland(Ocean, 'Caps'      )
+  NewIsland(Ocean, 'Rankin'    )
 
-  AddPhotos(Circus, '*.jpg')
+  Ocean = NewOcean('Friends')
+  Circus = NewIsland(Ocean, 'Circus')
+
+  Photos, Relationships = AddPhotos(Circus, '*.jpg')
+
+  #pprint.pprint(Photos)
+  #pprint.pprint(Relationships)
+
+  #for r in db.match(rel_type='IN', end_node=Circus):
+  #  pprint.pprint(r)
+  #'20130713_151500.jpg'
+
+  #Relationships[0].delete()
+
+  #somewhere on top, or in neo4j itself create an index:
+
+  #Then, create your node as usual, but do add it to the index:
+
+  #new_node = batch.create(node({"key":"value"}))
+  #Now, if you need to find your new_node, execute this:
+
+  #new_node_ref = index.get('filename', '20130713_151500.jpg')
+  #pprint.pprint(new_node_ref)
+  #This returns a list. new_node_ref[0] has the top item, in case you want/expect a single node.
+
 
 # -------------------------------------------------------------------------------
 # End.
