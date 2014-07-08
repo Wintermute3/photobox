@@ -8,7 +8,7 @@ CONTACT = 'bright.tiger@gmain.com'
 # Graphical photo management layer on top of a neo4j database.
 # -------------------------------------------------------------------------------
 
-import os, sys, tempfile, subprocess, time, datetime, pprint
+import os, sys, tempfile, subprocess, time, datetime, pprint, glob
 from optparse import OptionParser
 
 def CrashAndBurn(library):
@@ -167,10 +167,10 @@ def Neo4j_Init():
   print('Neo4j Server...check...', end='', flush=True)
   Text = DoCmd('neo4j info')
   for Line in Text:
-    if Line.startswith('Neo4j Server is running at pid '):
+    if 'Neo4j Server is running at pid ' in Line:
       Running = True
       break
-    if Line == 'Neo4j Server is not running':
+    if 'Neo4j Server is not running' in Line:
       print('starting...', end='', flush=True)
       DoCmd('neo4j start')
       print('check...', end='', flush=True)
@@ -183,43 +183,115 @@ def Neo4j_Init():
     print('running')
   else:
     print('not running!')
+    for Line in Text:
+      print(Line)
+  return Running
 
-Neo4j_Init()
-db = neo4j.GraphDatabaseService("http://localhost:7474/db/data/")
-db.clear()
-michael, lauren, suzanne, john, gail, jeff_m, jeff_k, joy = db.create(
-  {'name': 'michael', 'gender':   'male'},
-  {'name': 'lauren' , 'gender': 'female'},
-  {'name': 'suzanne', 'gender': 'female'},
-  {'name': 'john'   , 'gender':   'male'},
-  {'name': 'gail'   , 'gender': 'female'},
-  {'name': 'jeff_m' , 'gender':   'male'},
-  {'name': 'jeff_k' , 'gender':   'male'},
-  {'name': 'joy'    , 'gender': 'female'}
-)
+# -------------------------------------------------------------------------------
+# Test database load with people.
+# -------------------------------------------------------------------------------
 
-michael.add_labels('Family')
-lauren .add_labels('Family')
-suzanne.add_labels('Family')
-john   .add_labels('Family')
+def TestInitPeople():
 
-gail  .add_labels('Relative')
-jeff_m.add_labels('Relative')
-jeff_k.add_labels('Relative')
-joy   .add_labels('Relative')
+  michael, lauren, suzanne, john, gail, jeff_m, jeff_k, joy = db.create(
+    {'first_name': 'michael', 'last_name': 'nagy'   , 'gender':   'male'},
+    {'first_name': 'lauren' , 'last_name': 'marmaro', 'gender': 'female'},
+    {'first_name': 'suzanne', 'last_name': 'kosik'  , 'gender': 'female'},
+    {'first_name': 'john'   , 'last_name': 'nagy'   , 'gender':   'male'},
+    {'first_name': 'gail'   , 'last_name': 'nagy'   , 'gender': 'female'},
+    {'first_name': 'jeff'   , 'last_name': 'marmaro', 'gender':   'male'},
+    {'first_name': 'jeff'   , 'last_name': 'kosik'  , 'gender':   'male'},
+    {'first_name': 'joy'    , 'last_name': 'nagy'   , 'gender': 'female'}
+  )
 
-db.create(rel(michael, "SPOUSE", gail  ))
-db.create(rel(lauren , "SPOUSE", jeff_m))
-db.create(rel(suzanne, "SPOUSE", jeff_k))
-db.create(rel(john   , "SPOUSE", joy   ))
+  # Labels are the basis of indexes, and give the nodes type (and
+  # hence color) in the cypher web interface.
 
-db.create(rel(michael, "SIBLING", lauren ))
-db.create(rel(michael, "SIBLING", suzanne))
-db.create(rel(michael, "SIBLING", john   ))
+  michael.add_labels('Family')
+  lauren .add_labels('Family')
+  suzanne.add_labels('Family')
+  john   .add_labels('Family')
 
-db.create(rel(michael, "BROTHER", john   ))
-db.create(rel(lauren , "BROTHER", suzanne))
+  gail  .add_labels('Relative')
+  jeff_m.add_labels('Relative')
+  jeff_k.add_labels('Relative')
+  joy   .add_labels('Relative')
 
+  db.create(rel(michael, "SPOUSE", gail  ))
+  db.create(rel(lauren , "SPOUSE", jeff_m))
+  db.create(rel(suzanne, "SPOUSE", jeff_k))
+  db.create(rel(john   , "SPOUSE", joy   ))
+
+  db.create(rel(michael, "SIBLING", lauren ))
+  db.create(rel(michael, "SIBLING", suzanne))
+  db.create(rel(michael, "SIBLING", john   ))
+  db.create(rel(lauren , "SIBLING", suzanne))
+  db.create(rel(lauren , "SIBLING", john   ))
+  db.create(rel(suzanne, "SIBLING", john   ))
+
+  db.create(rel(michael, "BROTHER", john   ))
+  db.create(rel(lauren , "SISTER" , suzanne))
+
+# -------------------------------------------------------------------------------
+# Our schema is built out on the following node types:
+#
+#   photo . . . filename, filesize, color/monochrome flag, image dimensions and tags:
+#                   human-readable/searchable keywords
+#                   human-readable freeform text
+#                   machine-readable/searchable keywords
+#   set . . . . name, ordered group of photos
+#   view  . . . name, ordered group of sets
+#
+# Each view can contain one 'invisible' set which includes all photos that might
+# belong in the view but which are not yet assiged to a set in the group.  A
+# photo may belong to only one set in a view.
+#
+# For instance, assume a view named 'Families' which has sets named 'Nagy',
+# 'Tyson', 'Hedgepeth', 'Strickland', 'Kosik' etc.
+# -------------------------------------------------------------------------------
+
+def NewView(Name):
+  View, = db.create({'name': Name})
+  View.add_labels('View')
+  return View
+
+def NewSet(View, Name):
+  Set, = db.create({'name': Name})
+  Set.add_labels('Set')
+  db.create(rel(Set, 'IN', View))
+  return Set
+
+import matplotlib.pyplot as plt
+
+def AddPhotos(Set, Filter):
+  Filenames = glob.glob(Filter)
+  for Filename in Filenames:
+    Photo, = db.create({'filename': Filename})
+    Photo.add_labels('Photo')
+    db.create(rel(Photo, 'IN', Set))
+    x=plt.imread(Filename)
+    plt.imshow(x)
+    plt.show()
+
+if Neo4j_Init():
+  db = neo4j.GraphDatabaseService("http://localhost:7474/db/data/")
+  db.clear() # always start with an empty database.
+
+  View = NewView('Families')
+
+  NewSet(View, 'Nagy'      )
+  NewSet(View, 'Tyson'     )
+  NewSet(View, 'Hedgepeth' )
+  NewSet(View, 'Strickland')
+  NewSet(View, 'Kosik'     )
+  NewSet(View, 'Marmaro'   )
+  NewSet(View, 'Caps'      )
+  NewSet(View, 'Rankin'    )
+
+  Friends = NewView('Friends')
+  Circus = NewSet(Friends, 'Circus')
+
+  AddPhotos(Circus, '*.jpg')
 
 # -------------------------------------------------------------------------------
 # End.
