@@ -2,7 +2,7 @@
 photobox                                                     mnagy / jul-2013
 =============================================================================
 
-This python app interaces with a neo4j database and allows management of an
+This python app interfaces with a neo4j database and allows management of an
 image library.
 
 =============================================================================
