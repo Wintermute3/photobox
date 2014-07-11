@@ -206,6 +206,7 @@ def AddSetToSet(Name, Parent):
   Set, = db.create({'name': Name})
   Set.add_labels('Set')
   SetIndex.add('name', Name, Set)
+  print('>>> Added Set %s: [%s]' % (Set._id, Set['name']))
   if Parent:
     db.create(rel(Set, 'IN', Parent))
   return Set
@@ -230,18 +231,14 @@ def NewPixList(Filter):
     Pixs += [Pix]
     Pix.add_labels('Pix')
     PixIndex.add('filename', Filename, Pix)
-    print('>>> %s: %s added to Pix index' % (Pix._id, Pix['filename']))
+    print('>>> Added Pix %s: [%s]' % (Pix._id, Pix['filename']))
     #x = Image.open(Filename)
     #x.thumbnail((128,128))
     #x.show()
   return Pixs
 
 def AddPixListToSet(PixList, Set):
-  pprint.pprint(PixList)
-  pprint.pprint(Set)
-  print(Set._id,Set['name'])
   for Pix in PixList:
-    print(Pix._id,Pix['filename'])
     db.create(rel(Pix, 'IN', Set))
 
 def GetPixListByFilename(Filename):
@@ -286,21 +283,28 @@ if Neo4j_Init():
   Circus = AddSetToSet('Circus', Friends)
 
   PixList = NewPixList('*.jpg')
+  if len(PixList) == 0:
+    print('*** No jpg files found in working directory!')
+    os._exit(1)
+
   AddPixListToSet(PixList, Circus)
 
   # Choose a picture (in Circus)
 
-  HotPixList = GetPixListByFilename('20130713_150852.jpg')
+  PixList = GetPixListByFilename('20130713_150852.jpg')
+  if len(PixList) == 0:
+    print('*** No 20130713_150852.jpg file found in working directory!')
+    os._exit(1)
 
   # Unlink it from all sets (Circus)
 
-  for Rel in GetRelListOfPix(HotPixList[0]):
+  for Rel in GetRelListOfPix(PixList[0]):
     Rel.delete()
 
   # Link it to two new sets
 
-  AddPixListToSet(HotPixList, GetSetByName('Tyson'))
-  AddPixListToSet(HotPixList, GetSetByName('Nagy' ))
+  AddPixListToSet(PixList, GetSetByName('Tyson'))
+  AddPixListToSet(PixList, GetSetByName('Nagy' ))
 
 # -------------------------------------------------------------------------------
 # End.
