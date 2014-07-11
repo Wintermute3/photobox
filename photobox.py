@@ -189,71 +189,19 @@ def Neo4j_Init():
   return Running
 
 # -------------------------------------------------------------------------------
-# Test database load with people.
-# -------------------------------------------------------------------------------
-
-def TestInitPeople():
-
-  michael, lauren, suzanne, john, gail, jeff_m, jeff_k, joy = db.create(
-    {'first_name': 'michael', 'last_name': 'nagy'   , 'gender':   'male'},
-    {'first_name': 'lauren' , 'last_name': 'marmaro', 'gender': 'female'},
-    {'first_name': 'suzanne', 'last_name': 'kosik'  , 'gender': 'female'},
-    {'first_name': 'john'   , 'last_name': 'nagy'   , 'gender':   'male'},
-    {'first_name': 'gail'   , 'last_name': 'nagy'   , 'gender': 'female'},
-    {'first_name': 'jeff'   , 'last_name': 'marmaro', 'gender':   'male'},
-    {'first_name': 'jeff'   , 'last_name': 'kosik'  , 'gender':   'male'},
-    {'first_name': 'joy'    , 'last_name': 'nagy'   , 'gender': 'female'}
-  )
-
-  # Labels are the basis of indexes, and give the nodes type (and
-  # hence color) in the cypher web interface.
-
-  michael.add_labels('Family')
-  lauren .add_labels('Family')
-  suzanne.add_labels('Family')
-  john   .add_labels('Family')
-
-  gail  .add_labels('Relative')
-  jeff_m.add_labels('Relative')
-  jeff_k.add_labels('Relative')
-  joy   .add_labels('Relative')
-
-  db.create(rel(michael, "SPOUSE", gail  ))
-  db.create(rel(lauren , "SPOUSE", jeff_m))
-  db.create(rel(suzanne, "SPOUSE", jeff_k))
-  db.create(rel(john   , "SPOUSE", joy   ))
-
-  db.create(rel(michael, "SIBLING", lauren ))
-  db.create(rel(michael, "SIBLING", suzanne))
-  db.create(rel(michael, "SIBLING", john   ))
-  db.create(rel(lauren , "SIBLING", suzanne))
-  db.create(rel(lauren , "SIBLING", john   ))
-  db.create(rel(suzanne, "SIBLING", john   ))
-
-  db.create(rel(michael, "BROTHER", john   ))
-  db.create(rel(lauren , "SISTER" , suzanne))
-
-# -------------------------------------------------------------------------------
 # Our schema is built out on the following node types:
 #
-#   photo . . . . filename, filesize, color/monochrome flag, image dimensions and tags:
-#                   human-readable/searchable keywords
-#                   human-readable freeform text
-#                   machine-readable/searchable keywords
-#   island  . . . name, ordered group of photos
-#   ocean . . . . name, ordered group of islands
+#   pix . . . . filename, filesize, color/monochrome flag, image dimensions and tags:
+#                 human-readable/searchable keywords
+#                 human-readable freeform text
+#                 machine-readable/searchable keywords
+#   set . . . . name, ordered group of photos
 #
-# Each view can contain one 'invisible' set which includes all photos that might
-# belong in the view but which are not yet assiged to a set in the group.  A
-# photo may belong to only one set in a view.
-#
-# For instance, assume a view named 'Families' which has sets named 'Nagy',
-# 'Tyson', 'Hedgepeth', 'Strickland', 'Kosik' etc.
 # -------------------------------------------------------------------------------
 
 SetIndex = None
 
-def AddSet(Name, Parent=None):
+def AddSetToSet(Name, Parent):
   global SetIndex
   Set, = db.create({'name': Name})
   Set.add_labels('Set')
@@ -262,7 +210,10 @@ def AddSet(Name, Parent=None):
     db.create(rel(Set, 'IN', Parent))
   return Set
 
-def GetSet(Name):
+def NewSet(Name):
+  return AddSetToSet(Name, None)
+
+def GetSetByName(Name):
   Set, = SetIndex.get('name', Name)
   return Set
 
@@ -270,39 +221,41 @@ from PIL import Image
 
 PixIndex = None
 
-def AddPix(Filter, Set=None):
+def NewPixList(Filter):
   global PixIndex
   Filenames = glob.glob(Filter)
   Pixs = []
-  Rels = []
   for Filename in Filenames:
     Pix, = db.create({'filename': Filename})
+    Pixs += [Pix]
     Pix.add_labels('Pix')
     PixIndex.add('filename', Filename, Pix)
-    if Set:
-      Rels += db.create(rel(Pix, 'IN', Set))
-    Pixs += Pix
+    print('>>> %s: %s added to Pix index' % (Pix._id, Pix['filename']))
     #x = Image.open(Filename)
     #x.thumbnail((128,128))
     #x.show()
-  return Pixs, Rels
+  return Pixs
 
-def PixInSet(Pix, Set):
-  db.create(rel(Pix, 'IN', Set))
+def AddPixListToSet(PixList, Set):
+  pprint.pprint(PixList)
+  pprint.pprint(Set)
+  print(Set._id,Set['name'])
+  for Pix in PixList:
+    print(Pix._id,Pix['filename'])
+    db.create(rel(Pix, 'IN', Set))
 
-def GetPix(Filename):
-  Pix, = PixIndex.get('filename', Filename)
-  return Pix
+def GetPixListByFilename(Filename):
+  return PixIndex.get('filename', Filename)
 
-def GetRels(Pix):
+def GetRelListOfPix(Pix):
   return Pix.match_outgoing(rel_type='IN')
   #return list(graph_db.match(start_node=Pix, rel_type='IN'))
 
-def GetSets(Pix):
+def GetSetByNames(Pix):
   return list(graph_db.match(start_node=Pix, rel_type='IN'))
 
 
-  neo4j.Path(Pix, 'IN', )
+#  neo4j.Path(Pix, 'IN', )
 
 #import matplotlib.pyplot as plt
 
@@ -318,35 +271,36 @@ if Neo4j_Init():
   SetIndex = db.get_or_create_index(neo4j.Node, 'Set')
   PixIndex = db.get_or_create_index(neo4j.Node, 'Pix')
 
-  Families = AddSet('Families')
+  Families = NewSet('Families')
 
-  AddSet( 'Nagy'      , Families)
-  AddSet( 'Tyson'     , Families)
-  AddSet( 'Hedgepeth' , Families)
-  AddSet( 'Strickland', Families)
-  AddSet( 'Kosik'     , Families)
-  AddSet( 'Marmaro'   , Families)
-  AddSet( 'Caps'      , Families)
-  AddSet( 'Rankin'    , Families)
+  AddSetToSet( 'Nagy'      , Families)
+  AddSetToSet( 'Tyson'     , Families)
+  AddSetToSet( 'Hedgepeth' , Families)
+  AddSetToSet( 'Strickland', Families)
+  AddSetToSet( 'Kosik'     , Families)
+  AddSetToSet( 'Marmaro'   , Families)
+  AddSetToSet( 'Caps'      , Families)
+  AddSetToSet( 'Rankin'    , Families)
 
-  Friends = AddSet('Friends')
-  Circus = AddSet('Circus', Friends)
+  Friends = NewSet('Friends')
+  Circus = AddSetToSet('Circus', Friends)
 
-  Pixs, Rels = AddPix('*.jpg', Circus)
+  PixList = NewPixList('*.jpg')
+  AddPixListToSet(PixList, Circus)
 
   # Choose a picture (in Circus)
 
-  HotPix = GetPix('20130713_150852.jpg')
+  HotPixList = GetPixListByFilename('20130713_150852.jpg')
 
   # Unlink it from all sets (Circus)
 
-  for Rel in GetRels(HotPix):
+  for Rel in GetRelListOfPix(HotPixList[0]):
     Rel.delete()
 
   # Link it to two new sets
 
-  PixInSet(HotPix, GetSet('Tyson'))
-  PixInSet(HotPix, GetSet('Nagy' ))
+  AddPixListToSet(HotPixList, GetSetByName('Tyson'))
+  AddPixListToSet(HotPixList, GetSetByName('Nagy' ))
 
 # -------------------------------------------------------------------------------
 # End.
