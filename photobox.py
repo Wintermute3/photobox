@@ -178,6 +178,7 @@ def Neo4j_Init():
       for Line in Text:
         if Line.startswith('Neo4j Server is running at pid '):
           Running = True
+          time.sleep(2)
       break
   if Running:
     print('running')
@@ -250,33 +251,58 @@ def TestInitPeople():
 # 'Tyson', 'Hedgepeth', 'Strickland', 'Kosik' etc.
 # -------------------------------------------------------------------------------
 
-def NewOcean(Name):
-  Ocean, = db.create({'name': Name})
-  Ocean.add_labels('Ocean')
-  return Ocean
+SetIndex = None
 
-def NewIsland(Ocean, Name):
-  Island, = db.create({'name': Name})
-  Island.add_labels('Island')
-  db.create(rel(Island, 'IN', Ocean))
-  return Island
+def AddSet(Name, Parent=None):
+  global SetIndex
+  Set, = db.create({'name': Name})
+  Set.add_labels('Set')
+  SetIndex.add('name', Name, Set)
+  if Parent:
+    db.create(rel(Set, 'IN', Parent))
+  return Set
+
+def GetSet(Name):
+  Set, = SetIndex.get('name', Name)
+  return Set
 
 from PIL import Image
 
-def AddPhotos(Island, Filter):
+PixIndex = None
+
+def AddPix(Filter, Set=None):
+  global PixIndex
   Filenames = glob.glob(Filter)
-  Photos = []
-  Relationships = []
+  Pixs = []
+  Rels = []
   for Filename in Filenames:
-    Photo, = db.create({'filename': Filename})
-    Photo.add_labels('Photo')
-    Relationships += db.create(rel(Photo, 'IN', Island))
-    Photos += Photo
-    #db.add_indexed_node(Index, 'filename', Filename, Photo)
-    x = Image.open(Filename)
-    x.thumbnail((128,128))
-    x.show()
-  return Photos, Relationships
+    Pix, = db.create({'filename': Filename})
+    Pix.add_labels('Pix')
+    PixIndex.add('filename', Filename, Pix)
+    if Set:
+      Rels += db.create(rel(Pix, 'IN', Set))
+    Pixs += Pix
+    #x = Image.open(Filename)
+    #x.thumbnail((128,128))
+    #x.show()
+  return Pixs, Rels
+
+def PixInSet(Pix, Set):
+  db.create(rel(Pix, 'IN', Set))
+
+def GetPix(Filename):
+  Pix, = PixIndex.get('filename', Filename)
+  return Pix
+
+def GetRels(Pix):
+  return Pix.match_outgoing(rel_type='IN')
+  #return list(graph_db.match(start_node=Pix, rel_type='IN'))
+
+def GetSets(Pix):
+  return list(graph_db.match(start_node=Pix, rel_type='IN'))
+
+
+  neo4j.Path(Pix, 'IN', )
 
 #import matplotlib.pyplot as plt
 
@@ -286,47 +312,41 @@ def AddPhotos(Island, Filter):
 #  plt.show()
 
 if Neo4j_Init():
-  db = neo4j.GraphDatabaseService("http://localhost:7474/db/data/")
+  db = neo4j.GraphDatabaseService('http://localhost:7474/db/data/')
   db.clear() # always start with an empty database.
 
-  Index = db.get_or_create_index(neo4j.Node, "index_name")
+  SetIndex = db.get_or_create_index(neo4j.Node, 'Set')
+  PixIndex = db.get_or_create_index(neo4j.Node, 'Pix')
 
-  Ocean = NewOcean('Families')
+  Families = AddSet('Families')
 
-  NewIsland(Ocean, 'Nagy'      )
-  NewIsland(Ocean, 'Tyson'     )
-  NewIsland(Ocean, 'Hedgepeth' )
-  NewIsland(Ocean, 'Strickland')
-  NewIsland(Ocean, 'Kosik'     )
-  NewIsland(Ocean, 'Marmaro'   )
-  NewIsland(Ocean, 'Caps'      )
-  NewIsland(Ocean, 'Rankin'    )
+  AddSet( 'Nagy'      , Families)
+  AddSet( 'Tyson'     , Families)
+  AddSet( 'Hedgepeth' , Families)
+  AddSet( 'Strickland', Families)
+  AddSet( 'Kosik'     , Families)
+  AddSet( 'Marmaro'   , Families)
+  AddSet( 'Caps'      , Families)
+  AddSet( 'Rankin'    , Families)
 
-  Ocean = NewOcean('Friends')
-  Circus = NewIsland(Ocean, 'Circus')
+  Friends = AddSet('Friends')
+  Circus = AddSet('Circus', Friends)
 
-  Photos, Relationships = AddPhotos(Circus, '*.jpg')
+  Pixs, Rels = AddPix('*.jpg', Circus)
 
-  #pprint.pprint(Photos)
-  #pprint.pprint(Relationships)
+  # Choose a picture (in Circus)
 
-  #for r in db.match(rel_type='IN', end_node=Circus):
-  #  pprint.pprint(r)
-  #'20130713_151500.jpg'
+  HotPix = GetPix('20130713_150852.jpg')
 
-  #Relationships[0].delete()
+  # Unlink it from all sets (Circus)
 
-  #somewhere on top, or in neo4j itself create an index:
+  for Rel in GetRels(HotPix):
+    Rel.delete()
 
-  #Then, create your node as usual, but do add it to the index:
+  # Link it to two new sets
 
-  #new_node = batch.create(node({"key":"value"}))
-  #Now, if you need to find your new_node, execute this:
-
-  #new_node_ref = index.get('filename', '20130713_151500.jpg')
-  #pprint.pprint(new_node_ref)
-  #This returns a list. new_node_ref[0] has the top item, in case you want/expect a single node.
-
+  PixInSet(HotPix, GetSet('Tyson'))
+  PixInSet(HotPix, GetSet('Nagy' ))
 
 # -------------------------------------------------------------------------------
 # End.
