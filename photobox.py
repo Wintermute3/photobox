@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-VERSION = '1.407.061' # Y.YMM.DDn
+VERSION = '1.407.111' # Y.YMM.DDn
 PROGRAM = 'photobox.py'
-CONTACT = 'bright.tiger@gmain.com'
+CONTACT = 'bright.tiger@gmail.com'
 
 # -------------------------------------------------------------------------------
 # Graphical photo management layer on top of a neo4j database.
