@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-VERSION = '1.407.111' # Y.YMM.DDn
+VERSION = '1.407.121' # Y.YMM.DDn
 PROGRAM = 'photobox.py'
 CONTACT = 'bright.tiger@gmail.com'
 
@@ -9,7 +9,6 @@ CONTACT = 'bright.tiger@gmail.com'
 # -------------------------------------------------------------------------------
 
 import os, sys, tempfile, subprocess, time, datetime, pprint, glob
-from optparse import OptionParser
 
 def CrashAndBurn(library):
   print()
@@ -21,107 +20,6 @@ try:
   from py2neo import neo4j, node, rel
 except:
   CrashAndBurn('py2neo')
-
-# -------------------------------------------------------------------------------
-# Command-line parameters with default values.
-# -------------------------------------------------------------------------------
-
-Hostname      = None
-CsvFile       = 'doc/users-p3.csv'
-NewLimit      = 0
-CsvSkip       = 0
-LoginUsername = 'admin'
-LoginPassword = '11111'
-LoginDomain   = 'voalte.com'
-RestFlag      = False
-PatchFlag     = False
-ZapFlag       = False
-QueryFlag     = False
-TraceFlag     = False
-
-# -------------------------------------------------------------------------------
-# Show usage help and exit.
-# -------------------------------------------------------------------------------
-
-def ShowVersion():
-  print
-  print( '%s %s' % (PROGRAM, VERSION))
-  print
-
-def ShowHelp():
-  ShowVersion()
-  print('Given a csv file containing a set of users, add them to a p3 vds system (if newusers is')
-  print('greater than 0), else query p3 vds system.')
-  print
-  print('  Usage:  %s hostname [-c csvfile] [-s csvskip] [-n newusers]' % (sys.argv[0]))
-  print('                        [-u username] [-p password] [-d domain]')
-  print('                          [-t] [-z] [-q] [-r] [-x] [-v]')
-  print
-  print('  parameter     default            description')
-  print('  -----------   ----------------   ----------------------------------------')
-  print('     hostname                      hostname or ipv4 of target p3 vds system')
-  print('  -c csvfile    doc/users-p3.csv   csv file to read user definitions from')
-  print('  -s csvskip    0                  number of users to skip from csv file')
-  print('  -n newusers   0                  number of users to read from csv file')
-  print('  -u username   admin              p3 vds voalte_admin credential')
-  print('  -p password   11111              p3 vds voalte_admin credential')
-  print('  -d domain     voalte.com         p3 vds voalte_admin credential')
-  print('  -t            false              trace debug information to console')
-  print('  -z            false              zap database back to clean install state')
-  print('  -q            false              query and list table contents')
-  print('  -r            false              use rest api for initial user query')
-  print('  -x            false              execute temporary neo4j roles-patch')
-  print('  -v                               report script version')
-  print
-
-# -------------------------------------------------------------------------------
-# Parse command-line parameters for server address and quiet flag.
-# -------------------------------------------------------------------------------
-
-def GetCommandLineParameters():
-  global Hostname, CsvFile, NewLimit, CsvSkip, LoginUsername, LoginPassword, LoginDomain
-  global ZapFlag, RestFlag, TraceFlag, PatchFlag, QueryFlag
-  try:
-    Hostname = sys.argv[1]
-    if Hostname.startswith('-'):
-      if Hostname == '-v':
-        ShowVersion()
-      else:
-        ShowHelp()
-      os._exit(1)
-  except:
-    pass
-  parser = OptionParser()
-  parser.add_option('-c', dest='CsvFile'      , default=CsvFile      )
-  parser.add_option('-n', dest='NewLimit'     , default=NewLimit     )
-  parser.add_option('-s', dest='CsvSkip'      , default=CsvSkip      )
-  parser.add_option('-u', dest='LoginUsername', default=LoginUsername)
-  parser.add_option('-p', dest='LoginPassword', default=LoginPassword)
-  parser.add_option('-d', dest='LoginDomain'  , default=LoginDomain  )
-  parser.add_option('-t', dest='TraceFlag'    , default=TraceFlag    , action='store_true')
-  parser.add_option('-z', dest='ZapFlag'      , default=ZapFlag      , action='store_true')
-  parser.add_option('-q', dest='QueryFlag'    , default=QueryFlag    , action='store_true')
-  parser.add_option('-r', dest='RestFlag'     , default=RestFlag     , action='store_true')
-  parser.add_option('-x', dest='PatchFlag'    , default=PatchFlag    , action='store_true')
-  parser.add_option('-v', dest='VersionFlag'  , default=False        , action='store_true')
-  (options, args) = parser.parse_args(sys.argv[2:])
-  if options.VersionFlag:
-    ShowVersion()
-    os._exit(1)
-  if Hostname is None or Hostname == '':
-    ShowHelp()
-    os._exit(1)
-  CsvFile       = options.CsvFile
-  NewLimit      = int(options.NewLimit)
-  CsvSkip       = int(options.CsvSkip)
-  LoginUsername = options.LoginUsername
-  LoginPassword = options.LoginPassword
-  LoginDomain   = options.LoginDomain
-  TraceFlag     = options.TraceFlag
-  ZapFlag       = options.ZapFlag
-  QueryFlag     = options.QueryFlag
-  RestFlag      = options.RestFlag
-  PatchFlag     = options.PatchFlag
 
 # -------------------------------------------------------------------------------
 # Do a command and return the result as a string.  If an error occurs, prefix
