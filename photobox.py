@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+
 VERSION = '1.407.121' # Y.YMM.DDn
 PROGRAM = 'photobox.py'
 CONTACT = 'bright.tiger@gmail.com'
@@ -23,9 +25,17 @@ except:
   CrashAndBurn('py2neo')
 
 try:
-  from tkinter import *
+  TkLibName = 'Tkinter'
+  from Tkinter import * # python 2
+  PythonVer = 'python 2'
 except:
-  CrashAndBurn('tkinter')
+  try:
+    TkLibName = 'tkinter'
+    from tkinter import * # python 3
+    PythonVer = 'python 3'
+  except:
+    CrashAndBurn('tkinter')
+print('Loaded %s (%s)' % (TkLibName, PythonVer))
 
 try:
   from PIL import Image, ImageTk
@@ -71,18 +81,22 @@ def Neo4j(Hostname, Command):
 # Assure neo4j is running (start it if not already running).
 # -------------------------------------------------------------------------------
 
+def printx(Text):
+  print(Text, end='') # python 2 does not support flush, even with future
+  sys.stdout.flush()
+
 def Neo4j_Init():
   Running = False
-  print('Neo4j Server...check...', end='', flush=True)
+  printx('Neo4j Server...check...')
   Text = DoCmd('neo4j info')
   for Line in Text:
     if 'Neo4j Server is running at pid ' in Line:
       Running = True
       break
     if 'Neo4j Server is not running' in Line:
-      print('starting...', end='', flush=True)
+      printx('starting...')
       DoCmd('neo4j start')
-      print('check...', end='', flush=True)
+      printx('check...')
       Text = DoCmd('neo4j info')
       for Line in Text:
         if Line.startswith('Neo4j Server is running at pid '):
